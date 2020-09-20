@@ -11,18 +11,36 @@
 #define INIT_BUFFER_SIZE (64 * 1024)
 #define MAX_BUFFER_SIZE (10 * 1024 * 1024)
 
-#if defined(__linux__) || defined(__CYGWIN__) || defined(__CYGWIN32__)
+#if defined(__linux__)
+
 #define MAPS_PATH "/proc/%d/maps"
 #define MAPS_SELF_PATH "/proc/self/maps"
+#define PARSE_FORMAT                                                           \
+  "%" SCNx64 "-%" SCNx64 " %4s %" SCNx64 " %*x:%*x %" SCNd64 "%n"
+#define PARSE_VARS &start, &end, flags, &offset, &inode, &filename_offset
+#define PARSE_VARS_COUNT 5
+
+#elif defined(__CYGWIN__) || defined(__CYGWIN32__)
+
+#define MAPS_PATH "/proc/%d/maps"
+#define MAPS_SELF_PATH "/proc/self/maps"
+#define PARSE_FORMAT "%llx-%llx %*s %*llx %*x:%*x %lld %n"
+#define PARSE_VARS &start, &end, &inode, &filename_offset
+#define PARSE_VARS_COUNT 3
+
 #elif defined(__FreeBSD__)
+
 #define MAPS_PATH "/proc/%d/map"
 #define MAPS_SELF_PATH "/proc/curproc/map"
-#elif defined(__sun__)
-#define MAPS_PATH "/proc/%d/map"
-#define MAPS_SELF_PATH "/proc/self/map"
+#define PARSE_FORMAT                                                           \
+  "0x%" SCNx64 " 0x%" SCNx64 " %*d %*d %*p %3s %*d %*d 0x%*x %*s %*s %*s %n"
+#define PARSE_VARS &start, &end, flags, &filename_offset
+#define PARSE_VARS_COUNT 3
+
 #else
-#define MAPS_PATH ""
-#define MAPS_SELF_PATH ""
+
+#error Unsupported Unix variant
+
 #endif
 
 /**
@@ -115,13 +133,6 @@ bool get_proc_self_maps(parse_callback cb, void *data) {
   char *content, *pos, *pos_end;
   unsigned int total_rows = 0, row = 0;
 
-  uint64_t start, end, offset;
-  int64_t inode;
-  char flags[5];
-  unsigned int major, minor;
-  int filename_offset;
-  char *filename;
-
   content = read_file_to_string(MAPS_SELF_PATH, &str_len);
   if (!content) {
     return false;
@@ -139,10 +150,13 @@ bool get_proc_self_maps(parse_callback cb, void *data) {
   pos_end = content + str_len;
 
   while (*pos != 0 && pos < pos_end) {
-    if (sscanf(pos,
-               "%" SCNx64 "-%" SCNx64 " %4s %" SCNx64 " %x:%x %" SCNd64 "%n",
-               &start, &end, flags, &offset, &major, &minor, &inode,
-               &filename_offset) != 7) {
+    uint64_t start, end, offset = 0;
+    int64_t inode = 0;
+    char flags[] = "r-xp";
+    int filename_offset;
+    char *filename;
+
+    if (sscanf(pos, PARSE_FORMAT, PARSE_VARS) != PARSE_VARS_COUNT) {
       break;
     }
 
