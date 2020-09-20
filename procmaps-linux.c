@@ -2,6 +2,7 @@
 
 #ifdef ENABLE_LINUX_BUILD
 
+#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -159,7 +160,8 @@ bool get_proc_self_maps(parse_callback cb, void *data) {
     char *filename;
 
     if (sscanf(pos, PARSE_FORMAT, PARSE_VARS) != PARSE_VARS_COUNT) {
-      break;
+      free(content);
+      return false;
     }
 
     pos += filename_offset;
@@ -184,7 +186,7 @@ bool get_proc_self_maps(parse_callback cb, void *data) {
   }
 
   free(content);
-  return false;
+  return true;
 }
 
 #endif
