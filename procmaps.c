@@ -80,9 +80,10 @@ static bool read_file_to_buffer(const char *path, char **buffer_out,
 }
 
 /*
- * Allocates a buffer big enough to read the whole file into memory
+ * Allocates a buffer big enough to read the whole file into memory, and returns
+ * it as a string
  */
-static char *read_file_to_string(const char *path) {
+static char *read_file_to_string(const char *path, size_t *str_len) {
   char *buffer;
   size_t buffer_size;
   size_t file_size;
@@ -101,6 +102,7 @@ static char *read_file_to_string(const char *path) {
 
   /* Add a terminating 0 to turn the buffer into a string */
   buffer[file_size] = '\0';
+  *str_len = file_size;
 
   return buffer;
 }
@@ -109,7 +111,8 @@ static char *read_file_to_string(const char *path) {
  * Calls the callback cb for every correctly parsed row
  */
 bool get_proc_self_maps(parse_callback cb, void *data) {
-  char *content, *pos;
+  size_t str_len;
+  char *content, *pos, *pos_end;
   unsigned int total_rows = 0, row = 0;
 
   uint64_t start, end, offset;
@@ -119,7 +122,7 @@ bool get_proc_self_maps(parse_callback cb, void *data) {
   int filename_offset;
   char *filename;
 
-  content = read_file_to_string(MAPS_SELF_PATH);
+  content = read_file_to_string(MAPS_SELF_PATH, &str_len);
   if (!content) {
     return false;
   }
@@ -133,7 +136,9 @@ bool get_proc_self_maps(parse_callback cb, void *data) {
   }
 
   pos = content;
-  while (*pos != 0) {
+  pos_end = content + str_len;
+
+  while (*pos != 0 && pos < pos_end) {
     if (sscanf(pos,
                "%" SCNx64 "-%" SCNx64 " %4s %" SCNx64 " %x:%x %" SCNd64 "%n",
                &start, &end, flags, &offset, &major, &minor, &inode,
