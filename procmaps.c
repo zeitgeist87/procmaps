@@ -1,7 +1,10 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "procmaps.h"
 
@@ -23,7 +26,8 @@
 #endif
 
 /**
- * Returns true if EOF was reached an the whole file is in the buffer
+ * Returns true if EOF was reached and the whole file is in the buffer,
+ * otherwise false
  */
 static bool read_file(const char *path, char *buffer, size_t buffer_size,
                       size_t *bytes_read) {
@@ -49,8 +53,9 @@ static bool read_file(const char *path, char *buffer, size_t buffer_size,
  * Allocates a buffer and reads the whole file into it. Returns false if an
  * error occurred or the the file is bigger than MAX_BUFFER_SIZE
  */
-static bool read_whole_file(const char *path, char **buffer_out,
-                            size_t *file_size_out) {
+static bool read_file_to_buffer(const char *path, char **buffer_out,
+                                size_t *buffer_size_out,
+                                size_t *file_size_out) {
   char *buffer = malloc(INIT_BUFFER_SIZE);
   size_t buffer_size = INIT_BUFFER_SIZE;
   bool res = false;
@@ -66,6 +71,7 @@ static bool read_whole_file(const char *path, char **buffer_out,
 
   if (res) {
     *buffer_out = buffer;
+    *buffer_size_out = buffer_size;
   } else {
     free(buffer);
   }
@@ -73,24 +79,89 @@ static bool read_whole_file(const char *path, char **buffer_out,
   return res;
 }
 
-bool populate_proc_self_maps_df(populate_callback cb, void *data) {
-  char *content;
-  size_t content_len;
-  unsigned int i, total_rows = 0;
+/*
+ * Allocates a buffer big enough to read the whole file into memory
+ */
+static char *read_file_to_string(const char *path) {
+  char *buffer;
+  size_t buffer_size;
+  size_t file_size;
 
-  if (!read_whole_file(MAPS_SELF_PATH, &content, &content_len)) {
-    return false;
+  if (!read_file_to_buffer(path, &buffer, &buffer_size, &file_size)) {
+    return NULL;
   }
 
-  for (i = 0; i < content_len; ++i) {
-    if (content[i] == '\n') {
-      ++total_rows;
+  if (file_size == buffer_size) {
+    /* Make room for the terminating \0 */
+    buffer = realloc(buffer, buffer_size + 1);
+    if (!buffer) {
+      return NULL;
     }
   }
 
-  /*"55bd7ee28000-55bd7ee2a000 r--p 00000000 00:19 16394429 /usr/bin/cat"
+  /* Add a terminating 0 to turn the buffer into a string */
+  buffer[file_size] = '\0';
 
-  sscanf(text, "%"SCNx64"-%"SCNx64" %4s %"SCNx64" %x:%x %"SCNd64" %n",
-   *        start, end, flags, offset, major, minor, inode, filename_offset)*/
+  return buffer;
+}
+
+/**
+ * Calls the callback cb for every correctly parsed row
+ */
+bool get_proc_self_maps(parse_callback cb, void *data) {
+  char *content, *pos;
+  unsigned int total_rows = 0, row = 0;
+
+  uint64_t start, end, offset;
+  int64_t inode;
+  char flags[5];
+  unsigned int major, minor;
+  int filename_offset;
+  char *filename;
+
+  content = read_file_to_string(MAPS_SELF_PATH);
+  if (!content) {
+    return false;
+  }
+
+  pos = content;
+  while (*pos != 0) {
+    if (*pos == '\n') {
+      ++total_rows;
+    }
+    ++pos;
+  }
+
+  pos = content;
+  while (*pos != 0) {
+    if (sscanf(pos,
+               "%" SCNx64 "-%" SCNx64 " %4s %" SCNx64 " %x:%x %" SCNd64 "%n",
+               &start, &end, flags, &offset, &major, &minor, &inode,
+               &filename_offset) != 7) {
+      break;
+    }
+
+    pos += filename_offset;
+
+    /* Skip whitespace */
+    while (*pos == ' ' || *pos == '\t' || *pos == '\r') {
+      ++pos;
+    }
+
+    filename = pos;
+
+    /* Find newline */
+    while (*pos != 0 && *pos != '\n') {
+      ++pos;
+    }
+    *pos = '\0';
+
+    cb(data, row, total_rows, start, end, flags, offset, inode, filename);
+
+    pos += 1;
+    ++row;
+  }
+
+  free(content);
   return false;
 }
