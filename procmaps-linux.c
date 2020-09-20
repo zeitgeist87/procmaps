@@ -1,3 +1,7 @@
+#include "procmaps.h"
+
+#ifdef ENABLE_LINUX_BUILD
+
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -5,8 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "procmaps.h"
 
 #define INIT_BUFFER_SIZE (64 * 1024)
 #define MAX_BUFFER_SIZE (10 * 1024 * 1024)
@@ -184,3 +186,5 @@ bool get_proc_self_maps(parse_callback cb, void *data) {
   free(content);
   return false;
 }
+
+#endif
