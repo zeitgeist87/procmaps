@@ -31,7 +31,7 @@ void parse_callback_func(void *data, int row, int total_rows, uint64_t start,
          start, end, flags, offset, inode, filename, data, total_rows, row);
 }
 
-int main(int argc, char *argv[]) {
+int main() {
   bool callback_success = true;
   bool main_success;
 
