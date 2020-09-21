@@ -2,7 +2,7 @@ TARGET := test/procmaps_test
 
 CC := gcc
 LINKER := gcc
-CFLAGS := -std=c99 -ansi -pedantic -Wall -Wextra -Wno-unused-parameter -g -O1 -I.
+CFLAGS := -std=c99 -ansi -pedantic -Wall -Wextra -g -O1 -I.
 
 SRCFILES := $(wildcard *.c test/*.c)
 OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
@@ -12,7 +12,7 @@ all: $(TARGET)
 $(TARGET): $(OBJFILES)
 	$(LINKER) $^ -o $@
 
-%.o: %.cpp
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 check: $(TARGET)
