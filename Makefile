@@ -1,8 +1,8 @@
 TARGET := test/procmaps_test
 
-CC := gcc
-LINKER := gcc
-CFLAGS := -std=c99 -ansi -pedantic -Wall -Wextra -g -O1 -I.
+CC := c99
+LINKER := c99
+CFLAGS := -std=c99 -pedantic -Wall -Wextra -g -O1 -I.
 
 SRCFILES := $(wildcard *.c test/*.c)
 OBJFILES := $(patsubst %.c,%.o,$(SRCFILES))
