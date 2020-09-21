@@ -81,16 +81,18 @@ static bool read_file_to_buffer(const char *path, char **buffer_out,
   size_t buffer_size = INIT_BUFFER_SIZE;
   bool res = false;
 
-  while (buffer && buffer_size <= MAX_BUFFER_SIZE && !res) {
-    res = read_file(path, buffer, buffer_size, file_size_out);
-    if (!res) {
-      /* In case of an error, increase buffer size and try again */
-      buffer_size *= 2;
-      buffer = realloc(buffer, buffer_size);
-    }
+  while (buffer && buffer_size <= MAX_BUFFER_SIZE) {
+    /* Always leave room for null terminator */
+    res = read_file(path, buffer, buffer_size - 1, file_size_out);
+    if (res) break;
+
+    /* In case of an error, increase buffer size and try again */
+    buffer_size *= 2;
+    buffer = realloc(buffer, buffer_size);
   }
 
   if (res) {
+    buffer[*file_size_out] = '\0';
     *buffer_out = buffer;
     *buffer_size_out = buffer_size;
   } else {
@@ -113,18 +115,7 @@ static char *read_file_to_string(const char *path, size_t *str_len) {
     return NULL;
   }
 
-  if (file_size == buffer_size) {
-    /* Make room for the terminating \0 */
-    buffer = realloc(buffer, buffer_size + 1);
-    if (!buffer) {
-      return NULL;
-    }
-  }
-
-  /* Add a terminating 0 to turn the buffer into a string */
-  buffer[file_size] = '\0';
   *str_len = file_size;
-
   return buffer;
 }
 
